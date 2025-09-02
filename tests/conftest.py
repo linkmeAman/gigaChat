@@ -1,57 +1,93 @@
 """Test configuration and fixtures for the entire test suite."""
 import os
+import asyncio
 import pytest
-from typing import Generator, Any
+from typing import AsyncGenerator
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import sessionmaker
+from httpx import AsyncClient
 from app.core.database import Base
 from app.main import app
-from app.core.config import settings
+from tests.config import test_settings
+from app.core.database import get_db
 
-# Test database URL
-TEST_DATABASE_URL = "sqlite:///./test.db"
+# Set test environment
+os.environ["ENV_FILE"] = ".env.test"
 
-# Create test engine
-engine = create_engine(
-    TEST_DATABASE_URL,
-    connect_args={"check_same_thread": False}
+# Create async engine
+test_engine = create_async_engine(
+    test_settings.DATABASE_URL,
+    echo=True,
 )
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Create async session maker
+async_session = AsyncSession(bind=test_engine, expire_on_commit=False)
 
 @pytest.fixture(scope="session")
-def test_db():
+def event_loop():
+    """Create event loop for testing."""
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+    yield loop
+    loop.close()
+
+@pytest.fixture(scope="session")
+async def test_db():
     """Create test database tables."""
-    Base.metadata.create_all(bind=engine)
+    async with test_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.create_all)
     yield
-    Base.metadata.drop_all(bind=engine)
+    async with test_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
 
 @pytest.fixture
-def db_session(test_db: Any) -> Generator[Session, None, None]:
+async def db_session(test_db) -> AsyncGenerator[AsyncSession, None]:
     """Create a fresh database session for each test."""
-    connection = engine.connect()
-    transaction = connection.begin()
-    session = TestingSessionLocal(bind=connection)
-
-    yield session
-
-    session.close()
-    transaction.rollback()
-    connection.close()
+    try:
+        yield async_session
+        await async_session.rollback()  # Rollback any changes after the test
+    finally:
+        await async_session.close()  # Clean up the session
 
 @pytest.fixture
-def client(db_session: Session) -> Generator[TestClient, None, None]:
+async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """Create a test client with a clean database session."""
-    def override_get_db():
-        try:
-            yield db_session
-        finally:
-            db_session.close()
+    async def override_get_db():
+        yield db_session
 
-    app.dependency_overrides[settings.get_db] = override_get_db
-    with TestClient(app) as test_client:
-        yield test_client
-    app.dependency_overrides.clear()
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        async with AsyncClient(app=app, base_url="http://test") as ac:
+            yield ac
+    finally:
+        app.dependency_overrides.clear()
+
+@pytest.fixture
+async def auth_user(client: AsyncClient) -> dict:
+    """Create a test user for authentication."""
+    user_data = {
+        "email": test_settings.TEST_USER_EMAIL,
+        "password": test_settings.TEST_USER_PASSWORD,
+        "username": test_settings.TEST_USER_NAME
+    }
+    response = await client.post("/api/auth/register", json=user_data)
+    assert response.status_code == 201, f"Failed to create test user: {response.text}"
+    
+    # Return both user data and response data
+    response_data = response.json()
+    return {**user_data, **response_data}
+
+@pytest.fixture
+async def auth_token(client: AsyncClient, auth_user: dict) -> str:
+    """Get authentication token for test user."""
+    response = await client.post("/api/auth/login", data={
+        "username": auth_user["email"],
+        "password": test_settings.TEST_USER_PASSWORD
+    })
+    assert response.status_code == 200, f"Failed to login test user: {response.text}"
+    token_data = response.json()
+    return token_data["access_token"]
 
 @pytest.fixture
 def test_user(client: TestClient):
@@ -59,16 +95,20 @@ def test_user(client: TestClient):
     user_data = {
         "email": "test@example.com",
         "password": "testpassword123",
-        "full_name": "Test User"
+        "username": "testuser"
     }
-    response = client.post("/api/auth/register", json=user_data)
-    assert response.status_code == 201
-    return response.json()
+    response = client.post("/signup", json=user_data)
+    assert response.status_code == 200
+    
+    # Return both user data and response data
+    response_data = response.json()
+    user_data.update(response_data)
+    return user_data
 
 @pytest.fixture
 def test_user_token(client: TestClient, test_user: dict) -> str:
     """Get authentication token for test user."""
-    response = client.post("/api/auth/login", data={
+    response = client.post("/login", data={
         "username": test_user["email"],
         "password": "testpassword123"
     })

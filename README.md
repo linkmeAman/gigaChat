@@ -1,5 +1,10 @@
 # GigaChat v1.3.0-free
 
+[![Tests](https://github.com/linkmeAman/gigaChat/actions/workflows/tests.yml/badge.svg)](https://github.com/linkmeAman/gigaChat/actions/workflows/tests.yml)
+[![codecov](https://codecov.io/gh/linkmeAman/gigaChat/branch/master/graph/badge.svg)](https://codecov.io/gh/linkmeAman/gigaChat)
+[![Python Version](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 A powerful chat application with advanced features including AI integration, authentication, and multilingual support.
 
 ```

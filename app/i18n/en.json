@@ -1,0 +1,49 @@
+{
+    "chat": {
+        "send_message": "Send",
+        "new_chat": "New Chat",
+        "attachment": "Attach File",
+        "message_placeholder": "Type your message...",
+        "loading": "Loading...",
+        "error": "An error occurred"
+    },
+    "auth": {
+        "sign_in": "Sign In",
+        "sign_up": "Sign Up",
+        "sign_out": "Sign Out",
+        "email": "Email",
+        "password": "Password",
+        "confirm_password": "Confirm Password",
+        "2fa_code": "Enter 2FA Code",
+        "remember_me": "Remember Me",
+        "forgot_password": "Forgot Password?"
+    },
+    "errors": {
+        "invalid_credentials": "Invalid email or password",
+        "invalid_2fa": "Invalid 2FA code",
+        "account_locked": "Account locked. Please try again later",
+        "password_mismatch": "Passwords do not match",
+        "weak_password": "Password is too weak",
+        "email_taken": "Email is already taken"
+    },
+    "settings": {
+        "profile": "Profile",
+        "security": "Security",
+        "notifications": "Notifications",
+        "language": "Language",
+        "theme": "Theme",
+        "save_changes": "Save Changes"
+    },
+    "accessibility": {
+        "skip_to_main": "Skip to main content",
+        "open_menu": "Open menu",
+        "close_menu": "Close menu",
+        "toggle_theme": "Toggle theme",
+        "loading_indicator": "Content is loading",
+        "error_message": "Error: {message}",
+        "required_field": "{field} is required",
+        "selected": "{item} selected",
+        "expand": "Expand",
+        "collapse": "Collapse"
+    }
+}

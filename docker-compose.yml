@@ -1,0 +1,106 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gigachat-app
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/app
+      - uploads:/app/uploads
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MYSQL_HOST=db
+      - MYSQL_PORT=3306
+      - MYSQL_USER=gigachat
+      - MYSQL_PASSWORD=gigachat
+      - MYSQL_DATABASE=gigachat
+      - MINIO_HOST=minio
+      - MINIO_PORT=9000
+      - CLAMAV_HOST=clamav
+    depends_on:
+      - db
+      - redis
+      - minio
+      - clamav
+    networks:
+      - app-network
+      - monitoring
+
+  db:
+    image: mariadb:latest
+    container_name: gigachat-db
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_DATABASE=gigachat
+      - MYSQL_USER=gigachat
+      - MYSQL_PASSWORD=gigachat
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    networks:
+      - app-network
+
+  redis:
+    image: redis:alpine
+    container_name: gigachat-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - app-network
+
+  minio:
+    image: minio/minio
+    container_name: gigachat-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    command: server --console-address ":9001" /data
+    networks:
+      - app-network
+
+  clamav:
+    image: clamav/clamav
+    container_name: gigachat-clamav
+    volumes:
+      - clamav_data:/var/lib/clamav
+    networks:
+      - app-network
+
+  llm:
+    image: vllm/vllm-openai
+    container_name: gigachat-llm
+    ports:
+      - "8080:8080"
+    volumes:
+      - llm_models:/models
+    environment:
+      - MODEL=mistral-7b-instruct
+    networks:
+      - app-network
+
+volumes:
+  mariadb_data:
+  redis_data:
+  minio_data:
+  clamav_data:
+  llm_models:
+  uploads:
+
+networks:
+  app-network:
+    driver: bridge
+  monitoring:
+    external: true

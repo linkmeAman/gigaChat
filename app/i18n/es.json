@@ -1,0 +1,49 @@
+{
+    "chat": {
+        "send_message": "Enviar",
+        "new_chat": "Nuevo Chat",
+        "attachment": "Adjuntar Archivo",
+        "message_placeholder": "Escribe tu mensaje...",
+        "loading": "Cargando...",
+        "error": "Ocurrió un error"
+    },
+    "auth": {
+        "sign_in": "Iniciar Sesión",
+        "sign_up": "Registrarse",
+        "sign_out": "Cerrar Sesión",
+        "email": "Correo Electrónico",
+        "password": "Contraseña",
+        "confirm_password": "Confirmar Contraseña",
+        "2fa_code": "Ingresa el Código 2FA",
+        "remember_me": "Recordarme",
+        "forgot_password": "¿Olvidaste tu Contraseña?"
+    },
+    "errors": {
+        "invalid_credentials": "Correo o contraseña inválidos",
+        "invalid_2fa": "Código 2FA inválido",
+        "account_locked": "Cuenta bloqueada. Intenta más tarde",
+        "password_mismatch": "Las contraseñas no coinciden",
+        "weak_password": "La contraseña es muy débil",
+        "email_taken": "El correo ya está registrado"
+    },
+    "settings": {
+        "profile": "Perfil",
+        "security": "Seguridad",
+        "notifications": "Notificaciones",
+        "language": "Idioma",
+        "theme": "Tema",
+        "save_changes": "Guardar Cambios"
+    },
+    "accessibility": {
+        "skip_to_main": "Ir al contenido principal",
+        "open_menu": "Abrir menú",
+        "close_menu": "Cerrar menú",
+        "toggle_theme": "Cambiar tema",
+        "loading_indicator": "Cargando contenido",
+        "error_message": "Error: {message}",
+        "required_field": "{field} es requerido",
+        "selected": "{item} seleccionado",
+        "expand": "Expandir",
+        "collapse": "Colapsar"
+    }
+}

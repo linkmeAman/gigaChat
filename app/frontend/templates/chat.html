@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GigaChat</title>
+    <script src="https://unpkg.com/htmx.org@1.9.6"></script>
+    <script src="https://unpkg.com/hyperscript.org@0.9.11"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        .chat-container {
+            height: calc(100vh - 180px);
+        }
+        .message-input {
+            height: 100px;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <header class="flex justify-between items-center mb-8">
+            <h1 class="text-3xl font-bold text-gray-800">GigaChat</h1>
+            <div class="flex items-center space-x-4">
+                <button
+                    class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                    hx-get="/conversations/new"
+                    hx-target="#conversation-list"
+                    hx-swap="beforeend"
+                >
+                    New Chat
+                </button>
+                <div class="relative" x-data="{ open: false }">
+                    <button
+                        class="flex items-center space-x-2 text-gray-600 hover:text-gray-800"
+                        @click="open = !open"
+                    >
+                        <span id="user-name">{{ user.username }}</span>
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    <div
+                        x-show="open"
+                        @click.away="open = false"
+                        class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1"
+                    >
+                        <a href="/settings" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">Settings</a>
+                        <a href="/logout" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">Logout</a>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="flex h-full">
+            <!-- Sidebar -->
+            <aside class="w-64 bg-white rounded-lg shadow-md p-4 mr-8">
+                <div
+                    id="conversation-list"
+                    class="space-y-2"
+                    hx-get="/conversations"
+                    hx-trigger="load"
+                >
+                    <!-- Conversation items will be loaded here -->
+                </div>
+            </aside>
+
+            <!-- Chat Area -->
+            <main class="flex-1 bg-white rounded-lg shadow-md p-4">
+                <div id="chat-container" class="chat-container overflow-y-auto mb-4">
+                    <div
+                        id="message-list"
+                        class="space-y-4"
+                        hx-get="/messages"
+                        hx-trigger="load"
+                        hx-swap="innerHTML"
+                    >
+                        <!-- Messages will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Message Input -->
+                <div class="message-input">
+                    <form
+                        id="message-form"
+                        class="flex flex-col h-full"
+                        hx-post="/messages"
+                        hx-target="#message-list"
+                        hx-swap="beforeend"
+                    >
+                        <textarea
+                            name="content"
+                            class="flex-1 w-full p-2 border rounded-lg resize-none mb-2"
+                            placeholder="Type your message..."
+                        ></textarea>
+                        <div class="flex justify-between items-center">
+                            <div class="flex space-x-2">
+                                <label class="flex items-center space-x-2 text-gray-600">
+                                    <input type="file" class="hidden" name="attachment" accept=".txt,.pdf,.md,.png,.jpg,.csv,.json">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                    </svg>
+                                    <span>Attach File</span>
+                                </label>
+                            </div>
+                            <button
+                                type="submit"
+                                class="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600"
+                            >
+                                Send
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- WebSocket Connection -->
+    <script>
+        const ws = new WebSocket('ws://' + window.location.host + '/ws');
+        
+        ws.onmessage = function(event) {
+            const message = JSON.parse(event.data);
+            if (message.type === 'message') {
+                const messageList = document.getElementById('message-list');
+                messageList.insertAdjacentHTML('beforeend', message.html);
+                messageList.scrollTop = messageList.scrollHeight;
+            }
+        };
+
+        ws.onclose = function() {
+            console.log('WebSocket connection closed');
+            // Attempt to reconnect after a delay
+            setTimeout(() => {
+                window.location.reload();
+            }, 3000);
+        };
+    </script>
+</body>
+</html>

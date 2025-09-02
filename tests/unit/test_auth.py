@@ -17,19 +17,18 @@ def test_user_registration(client: TestClient):
     user_data = {
         "email": "newuser@example.com",
         "password": "testpassword123",
-        "full_name": "New User"
+        "username": "newuser"
     }
     
-    response = client.post("/api/auth/register", json=user_data)
-    assert response.status_code == 201
+    response = client.post("/signup", json=user_data)
+    assert response.status_code == 200
     data = response.json()
-    assert data["email"] == user_data["email"]
-    assert data["full_name"] == user_data["full_name"]
-    assert "id" in data
+    assert "access_token" in data
+    assert data["token_type"] == "bearer"
 
 def test_user_login(client: TestClient, test_user: dict):
     """Test user login endpoint."""
-    response = client.post("/api/auth/login", data={
+    response = client.post("/login", data={
         "username": test_user["email"],
         "password": "testpassword123"
     })
@@ -41,7 +40,7 @@ def test_user_login(client: TestClient, test_user: dict):
 
 def test_invalid_login(client: TestClient):
     """Test login with invalid credentials."""
-    response = client.post("/api/auth/login", data={
+    response = client.post("/login", data={
         "username": "wrong@example.com",
         "password": "wrongpassword"
     })
@@ -51,24 +50,24 @@ def test_invalid_login(client: TestClient):
 def test_protected_route(client: TestClient, test_user_token: str):
     """Test access to protected route with valid token."""
     response = client.get(
-        "/api/auth/me",
+        "/me",
         headers={"Authorization": f"Bearer {test_user_token}"}
     )
     
     assert response.status_code == 200
     data = response.json()
     assert "email" in data
-    assert "full_name" in data
+    assert "username" in data
 
 def test_protected_route_no_token(client: TestClient):
     """Test access to protected route without token."""
-    response = client.get("/api/auth/me")
+    response = client.get("/me")
     assert response.status_code == 401
 
 def test_protected_route_invalid_token(client: TestClient):
     """Test access to protected route with invalid token."""
     response = client.get(
-        "/api/auth/me",
+        "/me",
         headers={"Authorization": "Bearer invalid_token"}
     )
     assert response.status_code == 401

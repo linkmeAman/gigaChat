@@ -18,5 +18,11 @@ app.add_middleware(
 )
 
 # Import and include routers
-from app.api.v1.api import api_router
-app.include_router(api_router, prefix="/api/v1")
+from app.api.auth import router as auth_router
+from app.api.chat import router as chat_router
+from app.api.conversations import router as conversations_router
+
+# Include routers
+app.include_router(auth_router, tags=["auth"])
+app.include_router(chat_router, prefix="/api/chat", tags=["chat"])
+app.include_router(conversations_router, prefix="/api/conversations", tags=["conversations"])

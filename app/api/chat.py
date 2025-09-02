@@ -2,7 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 from app.core.database import get_db
-from app.models.models import User, Conversation, Message, Feedback
+from app.core.security import get_current_user
+from app.models.auth import User
+from app.models.models import Conversation, Message, Feedback
 from app.core.ai import get_ai_response
 from pydantic import BaseModel
 from datetime import datetime

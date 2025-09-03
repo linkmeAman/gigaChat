@@ -25,7 +25,6 @@ slowapi==0.1.9
 transformers>=4.32.0,<5.0.0
 spacy==3.7.4
 torch==2.2.1
-llama-cpp-python==0.2.56
 sentence-transformers==2.5.1
 faiss-cpu==1.8.0  # or faiss-gpu
 onnxruntime==1.17.0

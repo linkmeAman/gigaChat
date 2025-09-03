@@ -1,13 +1,18 @@
+import os
 import bcrypt
 import pyseto
 import hashlib
 import requests
-from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
+from datetime import datetime, timedelta, UTC
+from typing import Optional, Dict, Any, cast
+import json
+import base64
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
 from app.core.config import settings
 from sqlalchemy.orm import Session
 from app.models.auth import User, Session as UserSession
-import json
+from app.core.database import get_db
 import re
 
 def get_password_hash(password: str) -> str:
@@ -66,32 +71,33 @@ def validate_password_strength(password: str) -> tuple[bool, str]:
     
     return True, "Password meets security requirements"
 
-def create_access_token(data: Dict[str, Any], expires_delta: timedelta = None) -> str:
+def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
     """Create a Paseto token."""
     to_encode = data.copy()
     
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(UTC) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    
+        expire = datetime.now(UTC) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+
     to_encode.update({
-        "exp": expire,
+        "exp": expire.timestamp(),  # Convert to unix timestamp
         "iss": settings.PASETO_ISSUER,
         "aud": settings.PASETO_AUDIENCE,
-        "iat": datetime.utcnow()
+        "iat": datetime.now(UTC).timestamp()  # Convert to unix timestamp
     })
-    
+
+    # Get bytes for the key
+    secret_bytes = settings.PASETO_SECRET.encode() if isinstance(settings.PASETO_SECRET, str) else settings.PASETO_SECRET
     key = pyseto.Key.new(
         version=2,
         purpose="local",
-        key=settings.PASETO_SECRET.encode()
+        key=secret_bytes
     )
-    
+
     token = pyseto.encode(
         key,
-        payload=to_encode,
-        serializer=pyseto.JsonSerializer()
+        payload=to_encode
     )
     
     return token.decode()
@@ -99,24 +105,29 @@ def create_access_token(data: Dict[str, Any], expires_delta: timedelta = None) -
 def verify_token(token: str) -> Optional[dict]:
     """Verify and decode a Paseto token."""
     try:
+        # Get bytes for the key
+        secret_bytes = settings.PASETO_SECRET.encode() if isinstance(settings.PASETO_SECRET, str) else settings.PASETO_SECRET
         key = pyseto.Key.new(
             version=2,
             purpose="local",
-            key=settings.PASETO_SECRET.encode()
+            key=secret_bytes
         )
         
         # Add clock leeway for token validation
-        now = datetime.utcnow()
-        leeway = timedelta(seconds=settings.PASETO_LEEWAY_SECONDS)
+        now = datetime.now(UTC).timestamp()  # Convert to timestamp
+        leeway = settings.PASETO_LEEWAY_SECONDS
         
-        payload = pyseto.decode(
+        token_obj = pyseto.decode(
             key,
-            token.encode(),
-            serializer=pyseto.JsonSerializer()
+            token.encode()
         )
         
-        # Verify expiration with leeway
-        exp = datetime.fromtimestamp(payload["exp"])
+        # Convert payload to string if it's bytes
+        payload_str = token_obj.payload.decode() if isinstance(token_obj.payload, bytes) else str(token_obj.payload)
+        payload = cast(Dict[str, Any], json.loads(payload_str))
+        
+        # Verify expiration with leeway (using timestamps)
+        exp = payload["exp"]
         if exp - leeway <= now:
             return None
             
@@ -127,74 +138,54 @@ def verify_token(token: str) -> Optional[dict]:
             return None
             
         return payload
-    except:
+    except Exception as e:
+        print(f"Token verification failed: {e}")
         return None
 
-def check_account_lockout(user: User) -> bool:
-    """Check if account is locked and handle lockout expiry."""
-    if not user.is_locked:
-        return False
-        
-    if user.lockout_until and datetime.utcnow() > user.lockout_until:
-        # Lockout period expired, reset lockout
-        user.is_locked = False
-        user.failed_login_attempts = 0
-        user.lockout_until = None
-        return False
-        
-    return True
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
-def handle_failed_login(db: Session, user: User):
-    """Handle failed login attempt and implement account lockout."""
-    now = datetime.utcnow()
+async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
+    """Get the current authenticated user from the token."""
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+    payload = verify_token(token)
+    if not payload or "sub" not in payload:
+        raise credentials_exception
+
+    email = payload["sub"]
+    if not email:
+        raise credentials_exception
+
+    db = next(get_db())
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise credentials_exception
     
-    # Reset failed attempts if window expired
-    if user.last_failed_login:
-        window_start = now - timedelta(minutes=settings.ACCOUNT_LOCKOUT_WINDOW_MINUTES)
-        if user.last_failed_login < window_start:
-            user.failed_login_attempts = 0
-    
-    # Increment failed attempts
-    user.failed_login_attempts += 1
-    user.last_failed_login = now
-    
-    # Check if should lock account
-    if user.failed_login_attempts >= settings.ACCOUNT_LOCKOUT_THRESHOLD:
-        user.is_locked = True
-        user.lockout_until = now + timedelta(minutes=settings.ACCOUNT_LOCKOUT_DURATION_MINUTES)
-    
-    db.commit()
+    if not bool(user.is_active):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Inactive user"
+        )
+
+    return user
 
 def create_session(
     db: Session,
     user: User,
-    device_id: str,
-    device_info: dict,
-    ip_address: str
+    device_id: Optional[str] = None,
+    device_info: Optional[Dict[str, Any]] = None,
+    ip_address: Optional[str] = None
 ) -> UserSession:
     """Create a new session for the user."""
-    # Check concurrent session limit
-    active_sessions = db.query(UserSession).filter(
-        UserSession.user_id == user.id,
-        UserSession.is_active == True
-    ).count()
-    
-    if active_sessions >= settings.MAX_CONCURRENT_SESSIONS:
-        # Remove oldest session
-        oldest_session = db.query(UserSession).filter(
-            UserSession.user_id == user.id,
-            UserSession.is_active == True
-        ).order_by(UserSession.created_at).first()
-        
-        oldest_session.is_active = False
-        db.commit()
-    
-    # Create new session
     session = UserSession(
         user_id=user.id,
-        device_id=device_id,
-        device_info=json.dumps(device_info),
-        ip_address=ip_address,
+        device_id=device_id or "",
+        device_info=json.dumps(device_info or {}),
+        ip_address=ip_address or "127.0.0.1",
         expires_at=datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     )
     

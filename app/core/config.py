@@ -1,7 +1,10 @@
-from pydantic import BaseSettings, validator, SecretStr
+import os
 from typing import Optional, List
+from pydantic import validator, SecretStr
+from pydantic_settings import BaseSettings
 import secrets
 from datetime import timedelta
+import base64
 
 class Settings(BaseSettings):
     # Application
@@ -10,14 +13,31 @@ class Settings(BaseSettings):
     DESCRIPTION: str = "A free and open-source ChatGPT-like conversational web app"
     
     # Security
-    AUTH_PASSWORD_PEPPER: str = secrets.token_urlsafe(32)
-    PASETO_SECRET: str = secrets.token_urlsafe(32)
+    AUTH_PASSWORD_PEPPER: str = "secure_pepper_key_for_testing_only"
+    PASETO_SECRET: str = "12345678901234567890123456789012"  # Must be 32 chars
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
     PASETO_ISSUER: str = "GigaChat"
     PASETO_AUDIENCE: str = "GigaChat-Web"
     PASETO_LEEWAY_SECONDS: int = 60
     BCRYPT_WORK_FACTOR: int = 12
+    
+    @validator("PASETO_SECRET")
+    def validate_paseto_secret(cls, v):
+        """Ensure PASETO secret is exactly 32 bytes when encoded."""
+        if isinstance(v, bytes):
+            # Already bytes, ensure it's 32 bytes
+            if len(v) != 32:
+                raise ValueError("PASETO_SECRET must be 32 bytes long")
+            return v
+        elif isinstance(v, str):
+            # Convert string to bytes
+            secret_bytes = v.encode('utf-8')
+            # For strings shorter than 32 bytes, right pad with zeros
+            # For strings longer than 32 bytes, truncate
+            return secret_bytes[:32].ljust(32, b'\0')
+        else:
+            raise ValueError("PASETO_SECRET must be str or bytes")
     
     # Authentication
     ACCOUNT_LOCKOUT_THRESHOLD: int = 5
@@ -29,7 +49,7 @@ class Settings(BaseSettings):
     HIBP_API_KEY: Optional[SecretStr] = None
     
     # Database
-    DATABASE_URL: str = "mysql://root:password@localhost/gigachat"
+    DATABASE_URL: str = "sqlite:///./gigachat.db"
     DB_POOL_MIN_SIZE: int = 5
     DB_POOL_MAX_SIZE: int = 50
     DB_POOL_TIMEOUT_SECONDS: int = 30
@@ -40,8 +60,8 @@ class Settings(BaseSettings):
     
     # File Storage
     MINIO_ENDPOINT: str = "localhost:9000"
-    MINIO_ACCESS_KEY: SecretStr
-    MINIO_SECRET_KEY: SecretStr
+    MINIO_ACCESS_KEY: Optional[SecretStr] = None
+    MINIO_SECRET_KEY: Optional[SecretStr] = None
     MINIO_BUCKET: str = "gigachat"
     MAX_UPLOAD_SIZE_MB: int = 25
     ALLOWED_FILE_TYPES: List[str] = ["txt", "pdf", "md", "png", "jpg", "csv", "json"]
@@ -88,7 +108,9 @@ class Settings(BaseSettings):
         return v
     
     class Config:
-        env_file = ".env"
+        env_file = os.getenv("ENV_FILE", ".env")
+        env_file_encoding = "utf-8"
         case_sensitive = True
+        extra = "allow"  # Allow extra fields from environment variables
 
 settings = Settings()

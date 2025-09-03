@@ -1,0 +1,73 @@
+"""Test configuration and fixtures for the entire test suite."""
+import os
+import pytest
+from typing import Generator, Any
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, Session
+from app.core.database import Base
+from app.main import app
+from app.core.config import settings
+from app.core.database import get_db
+
+# Set test environment
+os.environ["ENV_FILE"] = ".env.test"
+os.environ["DATABASE_URL"] = SQLITE_DATABASE_URL
+
+# Create test engine with SQLite file database for testing
+SQLITE_DATABASE_URL = "sqlite:///./test.db"
+engine = create_engine(
+    SQLITE_DATABASE_URL,
+    connect_args={"check_same_thread": False}
+)
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+@pytest.fixture(scope="function")
+def test_db():
+    """Create test database tables."""
+    Base.metadata.create_all(bind=engine)
+    yield
+    Base.metadata.drop_all(bind=engine)
+
+@pytest.fixture
+def db_session(test_db: Any) -> Generator[Session, None, None]:
+    """Create a fresh database session for each test."""
+    session = TestingSessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
+
+@pytest.fixture
+def client() -> Generator[TestClient, None, None]:
+    """Create a test client with a clean database session."""
+    def override_get_db():
+        session = TestingSessionLocal()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    app.dependency_overrides[get_db] = override_get_db
+    with TestClient(app) as test_client:
+        yield test_client
+    app.dependency_overrides.clear()
+
+@pytest.fixture
+def test_user():
+    """Test user data."""
+    return {
+        "email": "test@example.com",
+        "password": "testpassword123",
+        "username": "testuser"
+    }
+
+@pytest.fixture
+def test_user_token(client: TestClient, test_user: dict) -> str:
+    """Get authentication token for test user."""
+    response = client.post("/login", data={
+        "username": test_user["email"],
+        "password": test_user["password"]
+    })
+    assert response.status_code == 200, response.text
+    return response.json()["access_token"]

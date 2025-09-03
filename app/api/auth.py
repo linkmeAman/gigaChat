@@ -3,10 +3,10 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import timedelta
 
-from app.core.security import hash_password, verify_password, create_token
+from app.core.security import get_password_hash, verify_password, create_access_token, get_current_user
 from app.core.database import get_db
 from app.core.config import settings
-from app.models.models import User
+from app.models.auth import User
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -19,6 +19,13 @@ class UserCreate(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+class UserResponse(BaseModel):
+    email: str
+    username: str
+
+    class Config:
+        orm_mode = True
 
 @router.post("/signup", response_model=Token)
 async def signup(user: UserCreate, db: Session = Depends(get_db)):
@@ -33,7 +40,7 @@ async def signup(user: UserCreate, db: Session = Depends(get_db)):
         )
 
     # Create new user
-    hashed_password = hash_password(user.password)
+    hashed_password = get_password_hash(user.password)
     db_user = User(
         email=user.email,
         username=user.username,
@@ -44,7 +51,7 @@ async def signup(user: UserCreate, db: Session = Depends(get_db)):
     db.refresh(db_user)
 
     # Create access token
-    access_token = create_token(
+    access_token = create_access_token(
         data={"sub": db_user.email},
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
@@ -62,8 +69,12 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
         )
 
     # Create access token
-    access_token = create_token(
+    access_token = create_access_token(
         data={"sub": user.email},
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     return {"access_token": access_token, "token_type": "bearer"}
+
+@router.get("/me", response_model=UserResponse)
+async def get_current_user_info(current_user: User = Depends(get_current_user)):
+    return current_user

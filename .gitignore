@@ -53,6 +53,12 @@ docker-volumes/
 # MinIO
 minio-data/
 
+# Coverage reports
+.coverage
+coverage.xml
+htmlcov/
+coverage_html/
+
 # System Files
 .DS_Store
 Thumbs.db

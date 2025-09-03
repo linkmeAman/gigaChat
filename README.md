@@ -1,5 +1,10 @@
 # GigaChat v1.3.0-free
 
+[![Tests](https://github.com/linkmeAman/gigaChat/actions/workflows/tests.yml/badge.svg)](https://github.com/linkmeAman/gigaChat/actions/workflows/tests.yml)
+[![codecov](https://codecov.io/gh/linkmeAman/gigaChat/branch/master/graph/badge.svg)](https://codecov.io/gh/linkmeAman/gigaChat)
+[![Python Version](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 A powerful chat application with advanced features including AI integration, authentication, and multilingual support.
 
 ```
@@ -231,6 +236,87 @@ If you're running low on disk space:
    dir /s
    # On Linux:
    du -h --max-depth=1
+   ```
+
+## 🧪 Testing
+
+### Running Tests
+
+1. **Setup Test Environment**
+   ```bash
+   # Install test dependencies
+   pip install pytest pytest-cov pytest-asyncio httpx aiosqlite
+
+   # Configure test environment
+   cp .env.example .env.test
+   # Edit .env.test for test settings
+   ```
+
+2. **Run Tests**
+   ```bash
+   # Run all tests with coverage
+   pytest
+
+   # Run specific test file
+   pytest tests/test_specific.py
+
+   # Run tests with specific marker
+   pytest -m unit  # Unit tests
+   pytest -m integration  # Integration tests
+   pytest -m auth  # Auth tests
+   ```
+
+3. **Coverage Reports**
+   - Terminal report is displayed after test run
+   - HTML report is generated in `htmlcov/`
+   - Open `htmlcov/index.html` to view detailed coverage
+
+### Test Configuration
+
+- Tests use SQLite for faster execution
+- Each test runs in isolation with transaction rollback
+- Async support is enabled by default
+- Coverage reports include branch coverage
+
+### Available Test Markers
+- `unit`: Unit tests
+- `integration`: Integration tests
+- `slow`: Slow running tests
+- `auth`: Authentication tests
+- `api`: API tests
+- `db`: Database tests
+
+### Writing Tests
+
+1. **Basic Test Structure**
+   ```python
+   import pytest
+   from httpx import AsyncClient
+
+   @pytest.mark.asyncio
+   async def test_example(client: AsyncClient):
+       response = await client.get("/api/endpoint")
+       assert response.status_code == 200
+   ```
+
+2. **Using Authentication**
+   ```python
+   async def test_protected_route(
+       client: AsyncClient,
+       auth_token: str
+   ):
+       headers = {"Authorization": f"Bearer {auth_token}"}
+       response = await client.get("/api/protected", headers=headers)
+       assert response.status_code == 200
+   ```
+
+3. **Database Tests**
+   ```python
+   @pytest.mark.db
+   async def test_db_operation(db_session: AsyncSession):
+       # Perform database operations
+       result = await db_session.execute(query)
+       await db_session.commit()
    ```
 
 ## 🔄 Branch Management

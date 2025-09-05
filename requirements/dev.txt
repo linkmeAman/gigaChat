@@ -1,0 +1,21 @@
+# Import base requirements
+-r base.txt
+
+# Development Tools
+pytest==8.0.0
+pytest-cov==4.1.0
+pytest-asyncio==0.23.5
+black==24.2.0
+mypy==1.8.0
+ruff==0.2.2
+bandit==1.7.7
+pre-commit==3.5.0
+
+# Documentation
+mkdocs==1.5.3
+mkdocs-material==9.5.3
+
+# Development Utilities
+ipython==8.12.0
+jupyter==1.0.0
+httpie==3.2.1

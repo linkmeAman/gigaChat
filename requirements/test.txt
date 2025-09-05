@@ -1,0 +1,13 @@
+# Import base requirements
+-r base.txt
+
+# Testing Tools
+pytest==8.0.0
+pytest-cov==4.1.0
+pytest-asyncio==0.23.5
+coverage==7.4.1
+pytest-xdist==3.5.0
+locust==2.24.0
+aioresponses==0.7.5
+responses==0.24.1
+faker==22.6.0
